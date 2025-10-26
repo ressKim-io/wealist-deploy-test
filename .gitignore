@@ -1,0 +1,37 @@
+# Environment variables
+.env
+
+# Docker volumes
+volumes/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Backup files
+*.bak
+*~
+
+# SSH keys (배포용)
+*.pem
+*.key
+id_rsa*
+
+# Terraform state (IaC 사용 시)
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Secrets
+secrets/
+*.secret
