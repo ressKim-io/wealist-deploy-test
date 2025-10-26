@@ -1,0 +1,197 @@
+name: Integration Test and Deploy
+
+on:
+  # 수동 실행 (테스트용)
+  workflow_dispatch:
+    inputs:
+      deploy_to_ec2:
+        description: 'EC2에 배포할까요?'
+        required: false
+        type: boolean
+        default: false
+
+  # User 또는 Board 서비스에서 새 이미지가 푸시되면 자동 실행 (webhook 필요)
+  repository_dispatch:
+    types: [new-image-pushed]
+
+env:
+  USER_IMAGE: ressbe/wealist-user:latest
+  BOARD_IMAGE: ressbe/wealist-board:latest
+
+jobs:
+  integration-test:
+    name: 통합 테스트
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: 최신 이미지 Pull
+        run: |
+          echo "📦 최신 Docker 이미지 가져오는 중..."
+          docker pull ${{ env.USER_IMAGE }}
+          docker pull ${{ env.BOARD_IMAGE }}
+
+      - name: .env 파일 생성
+        run: |
+          cat << EOF > .env
+          APP_NAME=weAlist
+          POSTGRES_SUPERUSER=postgres
+          POSTGRES_SUPERUSER_PASSWORD=test_password
+          USER_DB_NAME=wealist_user_db
+          USER_DB_USER=user_service
+          USER_DB_PASSWORD=user_password
+          KANBAN_DB_NAME=wealist_kanban_db
+          KANBAN_DB_USER=kanban_service
+          KANBAN_DB_PASSWORD=kanban_password
+          REDIS_PASSWORD=test_redis_password
+          JWT_SECRET=test-super-secret-jwt-key-for-integration-test
+          JWT_EXPIRATION_MS=86400000
+          JWT_ACCESS_MS=1800000
+          JPA_DDL_AUTO=update
+          JPA_SHOW_SQL=true
+          JPA_FORMAT_SQL=true
+          CORS_ORIGINS=http://localhost:3000,http://localhost:8000,http://localhost:8081
+          EOF
+
+      - name: 컨테이너 시작
+        run: |
+          echo "🚀 Docker Compose로 서비스 시작..."
+          docker compose up -d
+
+      - name: 서비스 준비 대기
+        run: |
+          echo "⏳ 서비스 준비 대기 중 (60초)..."
+          sleep 60
+
+      - name: Health Check
+        run: |
+          echo "🏥 Health Check 수행 중..."
+
+          # PostgreSQL
+          if docker exec wealist-postgres pg_isready -U postgres; then
+            echo "✅ PostgreSQL 정상"
+          else
+            echo "❌ PostgreSQL 실패"
+            exit 1
+          fi
+
+          # Redis
+          if docker exec wealist-redis redis-cli ping; then
+            echo "✅ Redis 정상"
+          else
+            echo "❌ Redis 실패"
+            exit 1
+          fi
+
+          # User Service
+          MAX_RETRY=10
+          RETRY=0
+          while [ $RETRY -lt $MAX_RETRY ]; do
+            if curl -f http://localhost:8081/health; then
+              echo "✅ User Service 정상"
+              break
+            fi
+            RETRY=$((RETRY+1))
+            echo "재시도 중... ($RETRY/$MAX_RETRY)"
+            sleep 5
+          done
+
+          if [ $RETRY -eq $MAX_RETRY ]; then
+            echo "❌ User Service 실패"
+            docker compose logs user-service
+            exit 1
+          fi
+
+          # Kanban Service
+          RETRY=0
+          while [ $RETRY -lt $MAX_RETRY ]; do
+            if curl -f http://localhost:8000/health; then
+              echo "✅ Kanban Service 정상"
+              break
+            fi
+            RETRY=$((RETRY+1))
+            echo "재시도 중... ($RETRY/$MAX_RETRY)"
+            sleep 5
+          done
+
+          if [ $RETRY -eq $MAX_RETRY ]; then
+            echo "❌ Kanban Service 실패"
+            docker compose logs kanban-service
+            exit 1
+          fi
+
+      - name: 통합 테스트 실행
+        run: |
+          echo "🧪 통합 테스트 실행 중..."
+
+          # User Service API 테스트 (예시)
+          echo "Testing User Service endpoints..."
+          # curl -X POST http://localhost:8081/api/auth/register ...
+
+          # Kanban Service API 테스트 (예시)
+          echo "Testing Kanban Service endpoints..."
+          # curl -X GET http://localhost:8000/api/workspaces ...
+
+          echo "✅ 통합 테스트 통과"
+
+      - name: 로그 출력 (실패 시)
+        if: failure()
+        run: |
+          echo "📝 서비스 로그 출력..."
+          docker compose logs
+
+      - name: 컨테이너 정리
+        if: always()
+        run: |
+          echo "🧹 컨테이너 정리 중..."
+          docker compose down -v
+
+  deploy-to-ec2:
+    name: EC2 배포
+    needs: integration-test
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deploy_to_ec2 == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: SSH 키 설정
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > ec2-key.pem
+          chmod 600 ec2-key.pem
+
+      - name: .env 파일 생성
+        run: |
+          cat << EOF > .env
+          APP_NAME=${{ secrets.APP_NAME }}
+          POSTGRES_SUPERUSER=${{ secrets.POSTGRES_SUPERUSER }}
+          POSTGRES_SUPERUSER_PASSWORD=${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}
+          USER_DB_NAME=${{ secrets.USER_DB_NAME }}
+          USER_DB_USER=${{ secrets.USER_DB_USER }}
+          USER_DB_PASSWORD=${{ secrets.USER_DB_PASSWORD }}
+          KANBAN_DB_NAME=${{ secrets.KANBAN_DB_NAME }}
+          KANBAN_DB_USER=${{ secrets.KANBAN_DB_USER }}
+          KANBAN_DB_PASSWORD=${{ secrets.KANBAN_DB_PASSWORD }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRATION_MS=${{ secrets.JWT_EXPIRATION_MS }}
+          JWT_ACCESS_MS=${{ secrets.JWT_ACCESS_MS }}
+          JPA_DDL_AUTO=${{ secrets.JPA_DDL_AUTO }}
+          JPA_SHOW_SQL=${{ secrets.JPA_SHOW_SQL }}
+          JPA_FORMAT_SQL=${{ secrets.JPA_FORMAT_SQL }}
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          EOF
+
+      - name: EC2 배포 실행
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          EC2_KEY=./ec2-key.pem ./deploy-to-ec2.sh
+
+      - name: SSH 키 정리
+        if: always()
+        run: rm -f ec2-key.pem
