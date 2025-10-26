@@ -10,6 +10,7 @@ weAlist 프로젝트의 중앙 집중식 배포 저장소입니다.
 - [빠른 시작](#빠른-시작)
 - [배포 가이드](#배포-가이드)
 - [GitHub Actions 설정](#github-actions-설정)
+- [자동화 배포 설정](#자동화-배포-설정)
 - [트러블슈팅](#트러블슈팅)
 
 ## 개요
@@ -283,6 +284,34 @@ CORS_ORIGINS: http://your-domain.com
 
 **자동 실행 (선택):**
 - User 또는 Board 서비스에서 webhook 설정 시 자동 실행
+- 설정 가이드: [NEXT_STEPS.md](./NEXT_STEPS.md)
+
+---
+
+## 자동화 배포 설정
+
+### Discord 알림 + 수동 승인 배포 (권장)
+
+**플로우:**
+```
+코드 Push → Docker 빌드 → 통합 테스트 → Discord 알림 → 수동 승인 → 배포
+```
+
+**설정 방법:**
+자세한 설정 가이드는 [NEXT_STEPS.md](./NEXT_STEPS.md)를 참조하세요.
+
+**필요한 것:**
+1. Discord Webhook
+2. GitHub Personal Access Token
+3. GitHub Secrets 설정
+
+**완성되면:**
+- ✅ 코드 push 시 자동으로 통합 테스트 실행
+- ✅ Discord로 배포 준비 알림
+- ✅ GitHub Actions에서 버튼 클릭으로 배포
+- ✅ 실수로 잘못된 코드 배포 방지
+
+---
 
 ## 트러블슈팅
 
@@ -379,12 +408,31 @@ docker exec -it wealist-postgres psql -U postgres
 docker exec -it wealist-redis redis-cli -a your_redis_password
 ```
 
+## 파일 구조
+
+```
+wealist-deploy/
+├── .github/
+│   └── workflows/
+│       └── integration-test.yml       # 통합 테스트 & 배포 워크플로우
+├── docker-compose.yaml                # 프로덕션 구성
+├── init-db.sh                         # PostgreSQL 초기화
+├── deploy.sh                          # 로컬 배포 스크립트
+├── deploy-to-ec2.sh                   # EC2 원격 배포
+├── .env.example                       # 환경 변수 템플릿
+├── README.md                          # 메인 문서 (이 파일)
+├── FIRST_DEPLOY.md                    # 첫 배포 가이드
+└── NEXT_STEPS.md                      # Discord 자동화 설정 가이드
+```
+
 ## 버전 정보
 
 - PostgreSQL: 17-alpine
 - Redis: 7.2-alpine
 - Docker Compose: 3.8
 - GitHub Actions: v6
+- Python: 3.11-alpine (Kanban Service)
+- Java: 17 (User Service)
 
 ## 라이센스
 
