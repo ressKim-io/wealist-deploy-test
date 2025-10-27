@@ -114,19 +114,19 @@ User/Board Service에서 Deploy Repository의 워크플로우를 트리거하기
 ### Secrets 확인 체크리스트
 
 #### weAlist-User-fork
-- [ ] `DEPLOY_TRIGGER_TOKEN` 설정됨
-- [ ] `DOCKER_HUB_TOKEN` 설정됨
+- [o] `DEPLOY_TRIGGER_TOKEN` 설정됨
+- [o] `DOCKER_HUB_TOKEN` 설정됨
 
 #### weAlist-Board-fork
-- [ ] `DEPLOY_TRIGGER_TOKEN` 설정됨
-- [ ] `DOCKER_HUB_TOKEN` 설정됨
+- [o] `DEPLOY_TRIGGER_TOKEN` 설정됨
+- [o] `DOCKER_HUB_TOKEN` 설정됨
 
 #### wealist-deploy-test
-- [ ] `DISCORD_WEBHOOK_URL` 설정됨
-- [ ] `EC2_SSH_KEY` 설정됨
-- [ ] `EC2_HOST` 설정됨
-- [ ] `EC2_USER` 설정됨
-- [ ] 모든 환경 변수 Secrets 설정됨 (운영 환경용)
+- [o] `DISCORD_WEBHOOK_URL` 설정됨
+- [o] `EC2_SSH_KEY` 설정됨
+- [o] `EC2_HOST` 설정됨
+- [o] `EC2_USER` 설정됨
+- [o] 모든 환경 변수 Secrets 설정됨 (운영 환경용)
 
 ---
 

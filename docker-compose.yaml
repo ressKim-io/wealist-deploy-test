@@ -18,10 +18,10 @@ services:
       - JPA_DDL_AUTO=${JPA_DDL_AUTO}
       - JPA_SHOW_SQL=${JPA_SHOW_SQL}
       - JPA_FORMAT_SQL=${JPA_FORMAT_SQL}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - REDIS_DB=0
+#      - REDIS_HOST=redis
+#      - REDIS_PORT=6379
+#      - REDIS_PASSWORD=${REDIS_PASSWORD}
+#      - REDIS_DB=0
     ports:
       - "8081:8080"
     networks:
