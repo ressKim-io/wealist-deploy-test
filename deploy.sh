@@ -49,21 +49,51 @@ docker compose up -d
 echo -e "${YELLOW}⏳ 서비스 준비 대기 중 (30초)...${NC}"
 sleep 30
 
+# 서비스 시작 후 상태 확인
+echo -e "${YELLOW}📊 컨테이너 상태 확인...${NC}"
+docker compose ps
+echo -e "${YELLOW}📝 최근 로그 확인...${NC}"
+docker compose logs --tail 10 user-service
+docker compose logs --tail 10 kanban-service
+
 # Health check
 echo -e "${YELLOW}🏥 Health check 수행 중...${NC}"
 
-# User Service health check
-if curl -f http://localhost:8081/health > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ User Service 정상 동작${NC}"
-else
-    echo -e "${RED}❌ User Service 응답 없음${NC}"
+# User Service health check (재시도 로직 추가)
+echo "User Service 상태 확인 중..."
+USER_RETRY=0
+MAX_RETRY=10
+while [ $USER_RETRY -lt $MAX_RETRY ]; do
+    if curl -f http://localhost:8081/health > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ User Service 정상 동작${NC}"
+        break
+    fi
+    USER_RETRY=$((USER_RETRY+1))
+    echo "User Service 재시도 중... ($USER_RETRY/$MAX_RETRY)"
+    sleep 5
+done
+
+if [ $USER_RETRY -eq $MAX_RETRY ]; then
+    echo -e "${RED}❌ User Service 응답 없음 - 로그 확인${NC}"
+    docker logs wealist-user-service --tail 20
 fi
 
-# Kanban Service health check
-if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Kanban Service 정상 동작${NC}"
-else
-    echo -e "${RED}❌ Kanban Service 응답 없음${NC}"
+# Kanban Service health check (재시도 로직 추가)
+echo "Kanban Service 상태 확인 중..."
+KANBAN_RETRY=0
+while [ $KANBAN_RETRY -lt $MAX_RETRY ]; do
+    if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Kanban Service 정상 동작${NC}"
+        break
+    fi
+    KANBAN_RETRY=$((KANBAN_RETRY+1))
+    echo "Kanban Service 재시도 중... ($KANBAN_RETRY/$MAX_RETRY)"
+    sleep 5
+done
+
+if [ $KANBAN_RETRY -eq $MAX_RETRY ]; then
+    echo -e "${RED}❌ Kanban Service 응답 없음 - 로그 확인${NC}"
+    docker logs wealist-kanban-service --tail 20
 fi
 
 # PostgreSQL health check
@@ -71,13 +101,15 @@ if docker exec wealist-postgres pg_isready -U postgres > /dev/null 2>&1; then
     echo -e "${GREEN}✅ PostgreSQL 정상 동작${NC}"
 else
     echo -e "${RED}❌ PostgreSQL 응답 없음${NC}"
+    docker logs wealist-postgres --tail 10
 fi
 
 # Redis health check
-if docker exec wealist-redis redis-cli ping > /dev/null 2>&1; then
+if docker exec wealist-redis redis-cli -a $REDIS_PASSWORD ping > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Redis 정상 동작${NC}"
 else
     echo -e "${RED}❌ Redis 응답 없음${NC}"
+    docker logs wealist-redis --tail 10
 fi
 
 echo ""
