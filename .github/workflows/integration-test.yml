@@ -195,3 +195,110 @@ jobs:
       - name: SSH 키 정리
         if: always()
         run: rm -f ec2-key.pem
+
+  notify-discord:
+    name: Discord 알림
+    needs: integration-test
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'repository_dispatch'
+
+    steps:
+      - name: Set notification color
+        id: color
+        run: |
+          if [ "${{ needs.integration-test.result }}" == "success" ]; then
+            echo "color=3066993" >> $GITHUB_OUTPUT  # Green
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "status=성공" >> $GITHUB_OUTPUT
+          else
+            echo "color=15158332" >> $GITHUB_OUTPUT  # Red
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "status=실패" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Discord notification
+        if: needs.integration-test.result == 'success'
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🚀 배포 준비 완료",
+                "description": "통합 테스트가 성공적으로 완료되었습니다!",
+                "color": '${{ steps.color.outputs.color }}',
+                "fields": [
+                  {
+                    "name": "서비스",
+                    "value": "`${{ github.event.client_payload.service }}`",
+                    "inline": true
+                  },
+                  {
+                    "name": "버전",
+                    "value": "`${{ github.event.client_payload.version }}`",
+                    "inline": true
+                  },
+                  {
+                    "name": "푸시한 사람",
+                    "value": "@${{ github.event.client_payload.actor }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "커밋",
+                    "value": "`${{ github.event.client_payload.commit }}`",
+                    "inline": false
+                  },
+                  {
+                    "name": "${{ steps.color.outputs.emoji }} 통합 테스트",
+                    "value": "${{ steps.color.outputs.status }}",
+                    "inline": false
+                  },
+                  {
+                    "name": "📦 다음 단계",
+                    "value": "EC2 배포를 원하시면 [GitHub Actions에서 수동으로 실행](https://github.com/ressKim-io/wealist-deploy-test/actions)하세요.\n\n**Actions → Integration Test and Deploy → Run workflow → ✅ deploy_to_ec2**",
+                    "inline": false
+                  }
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
+              }]
+            }'
+
+      - name: Send Discord notification (failure)
+        if: needs.integration-test.result != 'success'
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "❌ 통합 테스트 실패",
+                "description": "배포를 진행할 수 없습니다.",
+                "color": '${{ steps.color.outputs.color }}',
+                "fields": [
+                  {
+                    "name": "서비스",
+                    "value": "`${{ github.event.client_payload.service }}`",
+                    "inline": true
+                  },
+                  {
+                    "name": "버전",
+                    "value": "`${{ github.event.client_payload.version }}`",
+                    "inline": true
+                  },
+                  {
+                    "name": "푸시한 사람",
+                    "value": "@${{ github.event.client_payload.actor }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "커밋",
+                    "value": "`${{ github.event.client_payload.commit }}`",
+                    "inline": false
+                  },
+                  {
+                    "name": "🔍 로그 확인",
+                    "value": "[GitHub Actions 로그 보기](https://github.com/ressKim-io/wealist-deploy-test/actions)",
+                    "inline": false
+                  }
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
+              }]
+            }'
