@@ -89,7 +89,7 @@ jobs:
           MAX_RETRY=10
           RETRY=0
           while [ $RETRY -lt $MAX_RETRY ]; do
-            if curl -f http://localhost:8081/health; then
+            if curl -f http://localhost:8081/actuator/health; then
               echo "✅ User Service 정상"
               break
             fi
