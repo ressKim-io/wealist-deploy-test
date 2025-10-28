@@ -74,51 +74,53 @@ jobs:
             echo "✅ PostgreSQL 정상"
           else
             echo "❌ PostgreSQL 실패"
+            docker logs wealist-postgres --tail 20
             exit 1
           fi
 
-          # Redis
-          if docker exec wealist-redis redis-cli ping; then
+          # Redis (비밀번호 포함)
+          if docker exec wealist-redis redis-cli -a "test_redis_password" ping; then
             echo "✅ Redis 정상"
           else
             echo "❌ Redis 실패"
+            docker logs wealist-redis --tail 20
             exit 1
           fi
 
-          # User Service
-          MAX_RETRY=10
+          # User Service (경로 수정: actuator 제거)
+          MAX_RETRY=15
           RETRY=0
           while [ $RETRY -lt $MAX_RETRY ]; do
-            if curl -f http://localhost:8081/actuator/health; then
+            if curl -f -s http://localhost:8081/health > /dev/null 2>&1; then
               echo "✅ User Service 정상"
               break
             fi
             RETRY=$((RETRY+1))
-            echo "재시도 중... ($RETRY/$MAX_RETRY)"
+            echo "User Service 재시도 중... ($RETRY/$MAX_RETRY)"
             sleep 5
           done
 
           if [ $RETRY -eq $MAX_RETRY ]; then
             echo "❌ User Service 실패"
-            docker compose logs user-service
+            docker logs wealist-user-service --tail 30
             exit 1
           fi
 
           # Kanban Service
           RETRY=0
           while [ $RETRY -lt $MAX_RETRY ]; do
-            if curl -f http://localhost:8000/health; then
+            if curl -f -s http://localhost:8000/health > /dev/null 2>&1; then
               echo "✅ Kanban Service 정상"
               break
             fi
             RETRY=$((RETRY+1))
-            echo "재시도 중... ($RETRY/$MAX_RETRY)"
+            echo "Kanban Service 재시도 중... ($RETRY/$MAX_RETRY)"
             sleep 5
           done
 
           if [ $RETRY -eq $MAX_RETRY ]; then
             echo "❌ Kanban Service 실패"
-            docker compose logs kanban-service
+            docker logs wealist-kanban-service --tail 30
             exit 1
           fi
 
@@ -126,13 +128,23 @@ jobs:
         run: |
           echo "🧪 통합 테스트 실행 중..."
 
-          # User Service API 테스트 (예시)
+          # User Service API 테스트
           echo "Testing User Service endpoints..."
-          # curl -X POST http://localhost:8081/api/auth/register ...
+          if curl -f -s http://localhost:8081/health > /dev/null; then
+            echo "✅ User Service API 접근 가능"
+          else
+            echo "❌ User Service API 접근 실패"
+            exit 1
+          fi
 
-          # Kanban Service API 테스트 (예시)
+          # Kanban Service API 테스트
           echo "Testing Kanban Service endpoints..."
-          # curl -X GET http://localhost:8000/api/workspaces ...
+          if curl -f -s http://localhost:8000/health > /dev/null; then
+            echo "✅ Kanban Service API 접근 가능"
+          else
+            echo "❌ Kanban Service API 접근 실패"
+            exit 1
+          fi
 
           echo "✅ 통합 테스트 통과"
 
@@ -140,7 +152,16 @@ jobs:
         if: failure()
         run: |
           echo "📝 서비스 로그 출력..."
-          docker compose logs
+          echo "=== User Service 로그 ==="
+          docker logs wealist-user-service --tail 50
+          echo "=== Kanban Service 로그 ==="
+          docker logs wealist-kanban-service --tail 50
+          echo "=== PostgreSQL 로그 ==="
+          docker logs wealist-postgres --tail 30
+          echo "=== Redis 로그 ==="
+          docker logs wealist-redis --tail 30
+          echo "=== Docker Compose 상태 ==="
+          docker compose ps
 
       - name: 컨테이너 정리
         if: always()

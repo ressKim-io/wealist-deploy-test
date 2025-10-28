@@ -40,13 +40,20 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# SSH 연결 테스트
+echo -e "${YELLOW}📡 SSH 연결 테스트...${NC}"
+ssh -i "$EC2_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" "echo 'SSH 연결 성공'" || {
+    echo -e "${RED}❌ SSH 연결 실패${NC}"
+    exit 1
+}
+
 # EC2에 배포 디렉토리 생성
 echo -e "${YELLOW}📁 EC2에 배포 디렉토리 생성 중...${NC}"
-ssh -i "$EC2_KEY" "$EC2_USER@$EC2_HOST" "mkdir -p $DEPLOY_DIR"
+ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" "mkdir -p $DEPLOY_DIR"
 
 # 파일 전송
 echo -e "${YELLOW}📤 파일 전송 중...${NC}"
-scp -i "$EC2_KEY" \
+scp -i "$EC2_KEY" -o StrictHostKeyChecking=no \
     docker-compose.yaml \
     .env \
     init-db.sh \
@@ -55,10 +62,38 @@ scp -i "$EC2_KEY" \
 
 # 실행 권한 부여 및 배포
 echo -e "${YELLOW}🔧 배포 스크립트 실행 중...${NC}"
-ssh -i "$EC2_KEY" "$EC2_USER@$EC2_HOST" << EOF
+ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" << EOF
     cd $DEPLOY_DIR
     chmod +x deploy.sh init-db.sh
+
+    echo "🚀 weAlist 배포 시작..."
     ./deploy.sh
+
+    echo ""
+    echo "📊 최종 배포 상태:"
+    docker compose ps
+
+    echo ""
+    echo "🔍 Health Check 수행:"
+
+    # User Service Health Check
+    if curl -f -s http://localhost:8081/health > /dev/null 2>&1; then
+        echo "✅ User Service 정상 동작 (포트 8081)"
+    else
+        echo "❌ User Service 응답 없음"
+    fi
+
+    # Kanban Service Health Check
+    if curl -f -s http://localhost:8000/health > /dev/null 2>&1; then
+        echo "✅ Kanban Service 정상 동작 (포트 8000)"
+    else
+        echo "❌ Kanban Service 응답 없음"
+    fi
+
+    # 포트 바인딩 확인
+    echo ""
+    echo "🔌 포트 바인딩 상태:"
+    netstat -tlnp | grep -E ":800[01]"
 EOF
 
 echo ""
@@ -67,6 +102,11 @@ echo ""
 echo "🔗 서비스 접속:"
 echo "  User Service: http://$EC2_HOST:8081"
 echo "  Kanban Service: http://$EC2_HOST:8000"
+echo "  User Service API Docs: http://$EC2_HOST:8081/swagger-ui.html"
+echo "  Kanban Service API Docs: http://$EC2_HOST:8000/docs"
 echo ""
 echo "📝 원격 로그 확인:"
 echo "  ssh -i $EC2_KEY $EC2_USER@$EC2_HOST 'cd $DEPLOY_DIR && docker compose logs -f'"
+echo ""
+echo "🔧 원격 접속:"
+echo "  ssh -i $EC2_KEY $EC2_USER@$EC2_HOST"
