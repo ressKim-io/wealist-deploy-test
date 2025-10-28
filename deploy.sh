@@ -26,6 +26,7 @@ docker compose pull
 # 기존 컨테이너 정지 및 제거
 echo -e "${YELLOW}🛑 기존 컨테이너 정지 중...${NC}"
 docker compose down
+docker compose down
 
 # DB만 먼저 시작
 echo -e "${YELLOW}🗄️  데이터베이스 시작 중...${NC}"

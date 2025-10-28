@@ -72,6 +72,12 @@ services:
       POSTGRES_USER: ${POSTGRES_SUPERUSER}
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
       POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=en-US"
+      USER_DB_NAME: ${USER_DB_NAME}
+      USER_DB_USER: ${USER_DB_USER}
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD}
+      KANBAN_DB_NAME: ${KANBAN_DB_NAME}
+      KANBAN_DB_USER: ${KANBAN_DB_USER}
+      KANBAN_DB_PASSWORD: ${KANBAN_DB_PASSWORD}"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
