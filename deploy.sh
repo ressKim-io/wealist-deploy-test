@@ -65,7 +65,7 @@ echo "User Service 상태 확인 중..."
 USER_RETRY=0
 MAX_RETRY=10
 while [ $USER_RETRY -lt $MAX_RETRY ]; do
-    if curl -f http://localhost:8081/actuator/health > /dev/null 2>&1; then
+    if curl -f http://localhost:8081/health > /dev/null 2>&1; then
         echo -e "${GREEN}✅ User Service 정상 동작${NC}"
         break
     fi
