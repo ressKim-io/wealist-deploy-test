@@ -3,7 +3,7 @@ version: '3.8'
 services:
   #--- weAlist-User Service ---
   user-service:
-    image: ressbe/wealist-user:latest
+    image: ressbe/wealist-user:${USER_IMAGE_TAG:-latest}
     container_name: wealist-user-service
     environment:
       - DB_HOST=postgres
@@ -42,7 +42,7 @@ services:
 
   #--- Kanban Service ---
   kanban-service:
-    image: ressbe/wealist-board:latest
+    image: ressbe/wealist-board:${KANBAN_IMAGE_TAG:-latest}
     container_name: wealist-kanban-service
     environment:
       - DATABASE_URL=postgresql://${KANBAN_DB_USER}:${KANBAN_DB_PASSWORD}@postgres:5432/${KANBAN_DB_NAME}

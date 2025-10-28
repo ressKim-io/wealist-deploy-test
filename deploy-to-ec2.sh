@@ -134,18 +134,9 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" << 'EOF'
     # 원본 deploy.sh 백업
     cp deploy.sh deploy.sh.backup
 
-    # deploy.sh에서 docker compose 명령어를 docker-compose로 수정 (호환성)
-    sed -i 's/docker compose/sudo docker-compose/g' deploy.sh
-    sed -i 's/docker exec/sudo docker exec/g' deploy.sh
-    sed -i 's/docker logs/sudo docker logs/g' deploy.sh
-    sed -i 's/docker pull/sudo docker pull/g' deploy.sh
-
-    # 실행 권한 부여
     chmod +x deploy.sh init-db.sh
 
     echo "✅ 배포 스크립트 수정 완료"
-    echo "🔍 수정된 내용 확인:"
-    head -30 deploy.sh | grep -E "(docker|compose)"
 EOF
 
 # 배포 실행
@@ -169,9 +160,6 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" << 'EOF'
 
     echo ""
     echo "🔍 Health Check 수행:"
-
-    # 서비스 준비 대기
-    sleep 15
 
     # User Service Health Check
     if curl -f -s http://localhost:8081/health > /dev/null 2>&1; then

@@ -15,8 +15,8 @@ on:
     types: [new-image-pushed]
 
 env:
-  USER_IMAGE: ressbe/wealist-user:latest
-  BOARD_IMAGE: ressbe/wealist-board:latest
+  USER_IMAGE_TAG: ${{ github.event.client_payload.user_image_tag || 'latest' }}
+  KANBAN_IMAGE_TAG: ${{ github.event.client_payload.kanban_image_tag || 'latest' }}
 
 jobs:
   integration-test:
@@ -26,12 +26,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: 최신 이미지 Pull
-        run: |
-          echo "📦 최신 Docker 이미지 가져오는 중..."
-          docker pull ${{ env.USER_IMAGE }}
-          docker pull ${{ env.BOARD_IMAGE }}
 
       - name: .env 파일 생성
         run: |
@@ -60,68 +54,56 @@ jobs:
           echo "🚀 Docker Compose로 서비스 시작..."
           docker compose up -d
 
-      - name: 서비스 준비 대기
+      - name: 서비스 준비 대기 및 Health Check
         run: |
-          echo "⏳ 서비스 준비 대기 중 (60초)..."
-          sleep 60
+          echo "🏥 서비스 준비 대기 및 Health Check 수행 중..."
 
-      - name: Health Check
-        run: |
-          echo "🏥 Health Check 수행 중..."
+          check_service_health() {
+              local service_name=$1
+              local url=$2
+              local max_retry=${3:-20}
+              local retry=0
+
+              echo "${service_name} 상태 확인 중..."
+              while [ $retry -lt $max_retry ]; do
+                  if curl -f -s "$url" > /dev/null 2>&1; then
+                      echo "✅ ${service_name} 정상 동작"
+                      return 0
+                  fi
+                  retry=$((retry+1))
+                  echo "${service_name} 재시도 중... ($retry/$max_retry)"
+                  sleep 3
+              done
+
+              echo "❌ ${service_name} 응답 없음 - 로그 확인"
+              docker logs wealist-${service_name,,}-service --tail 20
+              return 1
+          }
 
           # PostgreSQL
-          if docker exec wealist-postgres pg_isready -U postgres; then
-            echo "✅ PostgreSQL 정상"
-          else
+          if ! docker exec wealist-postgres pg_isready -U postgres; then
             echo "❌ PostgreSQL 실패"
             docker logs wealist-postgres --tail 20
             exit 1
           fi
+          echo "✅ PostgreSQL 정상"
 
           # Redis (비밀번호 포함)
-          if docker exec wealist-redis redis-cli -a "test_redis_password" ping; then
-            echo "✅ Redis 정상"
-          else
+          if ! docker exec wealist-redis redis-cli -a "test_redis_password" ping; then
             echo "❌ Redis 실패"
             docker logs wealist-redis --tail 20
             exit 1
           fi
+          echo "✅ Redis 정상"
 
-          # User Service (경로 수정: actuator 제거)
-          MAX_RETRY=15
-          RETRY=0
-          while [ $RETRY -lt $MAX_RETRY ]; do
-            if curl -f -s http://localhost:8081/health > /dev/null 2>&1; then
-              echo "✅ User Service 정상"
-              break
-            fi
-            RETRY=$((RETRY+1))
-            echo "User Service 재시도 중... ($RETRY/$MAX_RETRY)"
-            sleep 5
-          done
-
-          if [ $RETRY -eq $MAX_RETRY ]; then
-            echo "❌ User Service 실패"
-            docker logs wealist-user-service --tail 30
-            exit 1
+          # User Service health check
+          if ! check_service_health "User Service" "http://localhost:8081/health" 20; then
+              exit 1
           fi
 
-          # Kanban Service
-          RETRY=0
-          while [ $RETRY -lt $MAX_RETRY ]; do
-            if curl -f -s http://localhost:8000/health > /dev/null 2>&1; then
-              echo "✅ Kanban Service 정상"
-              break
-            fi
-            RETRY=$((RETRY+1))
-            echo "Kanban Service 재시도 중... ($RETRY/$MAX_RETRY)"
-            sleep 5
-          done
-
-          if [ $RETRY -eq $MAX_RETRY ]; then
-            echo "❌ Kanban Service 실패"
-            docker logs wealist-kanban-service --tail 30
-            exit 1
+          # Kanban Service health check
+          if ! check_service_health "Kanban Service" "http://localhost:8000/health" 20; then
+              exit 1
           fi
 
       - name: 통합 테스트 실행

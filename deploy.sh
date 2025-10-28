@@ -22,6 +22,10 @@ fi
 # .env 파일 로드
 export $(grep -v '^#' .env | xargs)
 
+# 이미지 태그 환경 변수 설정 (기본값: latest)
+export USER_IMAGE_TAG=${USER_IMAGE_TAG:-latest}
+export KANBAN_IMAGE_TAG=${KANBAN_IMAGE_TAG:-latest}
+
 # Docker 이미지 Pull
 echo -e "${YELLOW}📦 최신 Docker 이미지를 가져오는 중...${NC}"
 docker compose pull
@@ -55,10 +59,6 @@ docker compose run --rm kanban-service alembic upgrade head || {
 # 서비스 시작
 echo -e "${YELLOW}🚀 서비스 시작 중...${NC}"
 docker compose up -d
-
-# 서비스별 준비 대기 (더 길게)
-echo -e "${YELLOW}⏳ 서비스 준비 대기 중 (45초)...${NC}"
-sleep 45
 
 # 서비스 시작 후 상태 확인
 echo -e "${YELLOW}📊 컨테이너 상태 확인...${NC}"
@@ -95,11 +95,13 @@ echo -e "${YELLOW}🏥 Health check 수행 중...${NC}"
 # User Service health check (경로 수정)
 if ! check_service_health "User Service" "http://localhost:8081/health" 15; then
     docker logs wealist-user-service --tail 20
+    exit 1 # User Service health check 실패 시 배포 중단
 fi
 
 # Kanban Service health check
 if ! check_service_health "Kanban Service" "http://localhost:8000/health" 10; then
     docker logs wealist-kanban-service --tail 20
+    exit 1 # Kanban Service health check 실패 시 배포 중단
 fi
 
 # PostgreSQL health check
