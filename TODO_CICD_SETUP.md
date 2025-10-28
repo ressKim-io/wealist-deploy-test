@@ -5,15 +5,6 @@
 
 ---
 
-## ✅ 완료된 작업
-
-- [x] User Service 워크플로우에 Deploy 트리거 추가
-- [x] Board Service 워크플로우에 Deploy 트리거 추가
-- [x] Deploy 워크플로우에 Discord 알림 job 추가
-- [x] CI/CD 설정 가이드 문서 작성
-
----
-
 ## 📋 다음에 할 작업 (순서대로)
 
 ### 1단계: Discord Webhook 생성
