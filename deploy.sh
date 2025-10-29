@@ -93,7 +93,7 @@ check_service_health() {
 echo -e "${YELLOW}🏥 Health check 수행 중...${NC}"
 
 # User Service health check (경로 수정)
-if ! check_service_health "User Service" "http://localhost:8081/health" 15; then
+if ! check_service_health "User Service" "http://localhost:8080/health" 15; then
     docker logs wealist-user-service --tail 20
     exit 1 # User Service health check 실패 시 배포 중단
 fi
@@ -128,7 +128,7 @@ docker compose ps
 
 echo ""
 echo "🌐 서비스 접속 URL:"
-echo "  User Service: http://localhost:8081/swagger-ui.html"
+echo "  User Service: http://localhost:8080/swagger-ui.html"
 echo "  Kanban Service: http://localhost:8000/docs"
 echo ""
 echo "📝 로그 확인:"
