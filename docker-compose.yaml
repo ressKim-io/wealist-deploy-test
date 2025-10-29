@@ -6,33 +6,44 @@ services:
     image: ressbe/wealist-user:${USER_IMAGE_TAG:-latest}
     container_name: wealist-user-service
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=${USER_DB_NAME}
-      - DB_USER=${USER_DB_USER}
-      - DB_PASSWORD=${USER_DB_PASSWORD}
+      # Spring Boot 표준 데이터베이스 설정
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${USER_DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${USER_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${USER_DB_PASSWORD}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+
       - APP_NAME=${APP_NAME}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION_MS=${JWT_EXPIRATION_MS}
       - JWT_ACCESS_MS=${JWT_ACCESS_MS}
-      - JPA_DDL_AUTO=${JPA_DDL_AUTO}
-      - JPA_SHOW_SQL=${JPA_SHOW_SQL}
-      - JPA_FORMAT_SQL=${JPA_FORMAT_SQL}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - REDIS_DB=0
+
+      # JPA/Hibernate 설정
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=${JPA_DDL_AUTO}
+      - SPRING_JPA_SHOW_SQL=${JPA_SHOW_SQL}
+      - SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL=${JPA_FORMAT_SQL}
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+
+      # Redis 설정
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SPRING_REDIS_DATABASE=0
+
       - USER_SERVICE_PORT=${USER_SERVICE_PORT}
-    ports:
-      - "8081:8080"
-    networks:
-      - wealist-net
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+
+    ports:
+      - "${USER_SERVICE_PORT}:${USER_SERVICE_PORT}"
+    networks:
+      - wealist-net
+
     restart: unless-stopped
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -44,11 +55,12 @@ services:
   kanban-service:
     image: ressbe/wealist-board:${KANBAN_IMAGE_TAG:-latest}
     container_name: wealist-kanban-service
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]  # ← 이 라인 추가
     environment:
       - DATABASE_URL=postgresql://${KANBAN_DB_USER}:${KANBAN_DB_PASSWORD}@postgres:5432/${KANBAN_DB_NAME}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - SECRET_KEY=${JWT_SECRET}
-      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
     ports:
       - "8000:8000"
     networks:
@@ -62,8 +74,6 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
-      timeout: 3s
-      retries: 3
 
   #--- Shared PostgreSQL (multi-database) ---
   postgres:
